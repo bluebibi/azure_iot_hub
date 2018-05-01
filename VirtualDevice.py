@@ -9,11 +9,15 @@ import iothub_client
 from iothub_client import IoTHubClient, IoTHubClientError, IoTHubTransportProvider, IoTHubClientResult
 from iothub_client import IoTHubMessage, IoTHubMessageDispositionResult, IoTHubError, DeviceMethodReturnValue
 
+from CsvReader import *
+
 PROTOCOL = IoTHubTransportProvider.MQTT
 MESSAGE_TIMEOUT = 10000
 AVG_WIND_SPEED = 10.0
 SEND_CALLBACKS = 0
-MSG_TXT = '{"deviceId": "VirtualDevice0001", "windSpeed": %.2f}'
+MSG_TXT = '{"deviceId": "VirtualDevice0001", "torque": %s, "displacement": %s, "velocity": %s, "acceleration": %s}'
+
+readFileList = []
 
 def send_confirmation_callback(message, result, user_context):
     global SEND_CALLBACKS
@@ -41,28 +45,33 @@ def iothub_client_telemetry_sample_run():
         print("IoT Hub device sending periodic messages, press Ctrl-C to exit\n")
         message_counter = 0
 
+        filename = 'data{0}.csv'
+
         while True:
-            msg_txt_formatted = MSG_TXT % (AVG_WIND_SPEED + (random.random() * 4 + 2))
-            # messages can be encoded as string or bytearray
-            if (message_counter % 2) == 1:
-                message = IoTHubMessage(bytearray(msg_txt_formatted, 'utf8'))
-                prop_text = "bytearray_%d" % message_counter
-            else:
-                message = IoTHubMessage(msg_txt_formatted)
-                prop_text = "string_%d" % message_counter
+
+            print(filename.format(0,))
+
+            torque, displacement, velocity, acceleration = get_values_from_file(filename=filename.format(0,))
+
+            msg = MSG_TXT % (str(torque), str(displacement), str(velocity), str(acceleration))
+            b_array = bytearray(msg, 'utf8')
+            message = IoTHubMessage(b_array)
+
             # optional: assign ids
             message.message_id = "message_%d" % message_counter
             message.correlation_id = "correlation_%d" % message_counter
+
             # optional: assign properties
-            prop_map = message.properties()
-            prop_map.add("Property", prop_text)
+            #prop_text = "bytearray_%d" % message_counter
+            #prop_map = message.properties()
+            #prop_map.add("Property", prop_text)
 
             client.send_event_async(message, send_confirmation_callback, message_counter)
             print("IoTHubClient.send_event_async accepted message [%d] for transmission to IoT Hub." % message_counter)
             status = client.get_send_status()
             print("Send status: %s" % status)
 
-            time.sleep(10)
+            time.sleep(2)
 
             status = client.get_send_status()
             print("Send status: %s" % status)
